@@ -78,12 +78,44 @@ overrides the literal in `emojis.json` via `emojis.uploaded.json`.
 ## Feature overview
 
 ### Tickets
-- `Cz!ticket panel` — posts a panel with an "Open Ticket" button.
-- `Cz!ticket category <#category>` — where new ticket channels are created.
-- `Cz!ticket role <@role>` — support role that can see/manage tickets.
-- `Cz!ticket logs <#channel>` — where closed-ticket transcripts are posted.
-- `Cz!ticket close` — closes the current ticket channel.
+`Cz!ticket panel` posts a branded panel with a **Select a ticket category...**
+dropdown, exactly like the reference design:
+
+    N U L L D E V
+
+    > Please create tickets in the correct category.
+
+    Read this first:
+    > We've had way too many tickets like that.
+    > Please be literate and use the right category.
+
+    [ Select a ticket category...  v ]
+
+- Picking an option opens a private channel named `ticket-0001-<key>` in that
+  category's channel category, with that category's support role added.
+- `Cz!ticket type add <key> <label> [#category] [@role] [emoji]` — add or
+  update a dropdown option (up to 25). Example:
+  `Cz!ticket type add bug "Bug Report" #Bugs @Developer`
+- `Cz!ticket type remove <key>` / `Cz!ticket type list` — manage options.
+- `Cz!ticket note <line 1 | line 2>` — edit the "Read this first" text.
+- `Cz!ticket category <#category>` / `Cz!ticket role <@role>` — fallbacks used
+  when a dropdown option has no category/role of its own.
+- `Cz!ticket logs <#channel>` — where closed-ticket transcripts and summaries
+  are posted. `Cz!ticket close` closes the current ticket.
+- The first panel seeds five default categories (General Support, Report a User,
+  Appeal a Punishment, Partnership, Other) so the dropdown works immediately.
 - Each ticket channel gets Claim/Unclaim and Close Ticket buttons.
+
+### Suggestions
+Every suggestion is posted as a card: the author's avatar, a quoted
+`Suggested by <name>` block, **Cast Your Vote Below!** and
+**Support (n)** / **Oppose (n)** buttons. Your own vote is toggled by clicking
+either button again.
+
+### Feedback
+`Cz!feedback panel` posts a **Submit a Review** button. A submitted review is
+posted as a card with the reviewer's avatar, the quoted review and a
+**Rating** row of NullDev stars, plus a **Submit a Review** button underneath.
 
 ### Team Setup (all commands are owner only)
 Shows which staff are available right now in a single panel, like:

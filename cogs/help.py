@@ -69,11 +69,16 @@ HELP_OVERRIDES = {
     "user limit clear": "Remove a daily action limit for a staff member. Owner only.",
     "user limit show": "Show a member's daily action limits and today's usage.",
     "ticket": "Show ticket system setup commands.",
-    "ticket panel": "Post the ticket panel in this channel.",
-    "ticket category": "Set the category where new ticket channels are created.",
-    "ticket role": "Set the support role that can view and manage tickets.",
+    "ticket panel": "Post the ticket panel with its category dropdown.",
+    "ticket category": "Set the fallback category for new ticket channels.",
+    "ticket role": "Set the fallback support role that can view and manage tickets.",
     "ticket logs": "Set the channel where closed ticket transcripts are posted.",
+    "ticket note": "Edit the 'Read this first' lines shown on the panel (separate with |).",
     "ticket close": "Close the current ticket channel.",
+    "ticket type": "Manage the dropdown ticket categories.",
+    "ticket type add": "Add or update a dropdown ticket category with its own category/role.",
+    "ticket type remove": "Remove a dropdown ticket category.",
+    "ticket type list": "Show the configured dropdown ticket categories.",
     "botaccess": "Manage who can use action commands. Owner only.",
     "botaccess add": "Give a user access to action commands. Owner only.",
     "botaccess remove": "Remove a user's access to action commands. Owner only.",
@@ -102,18 +107,25 @@ HELP_OVERRIDES = {
 }
 
 def _iter_commands(cog: commands.Cog):
-    for cmd in cog.get_commands():
+    def walk(cmd: commands.Command):
         if cmd.hidden:
-            continue
+            return
         if isinstance(cmd, commands.Group):
             if cmd.invoke_without_command:
-                yield (f"{cmd.qualified_name} {cmd.signature}".strip(), HELP_OVERRIDES.get(cmd.qualified_name, cmd.help or "Opens the panel."))
+                yield (
+                    f"{cmd.qualified_name} {cmd.signature}".strip(),
+                    HELP_OVERRIDES.get(cmd.qualified_name, cmd.help or "Opens the panel."),
+                )
             for sub in cmd.commands:
-                if sub.hidden:
-                    continue
-                yield (f"{sub.qualified_name} {sub.signature}".strip(), HELP_OVERRIDES.get(sub.qualified_name, sub.help or "—"))
+                yield from walk(sub)
         else:
-            yield (f"{cmd.qualified_name} {cmd.signature}".strip(), HELP_OVERRIDES.get(cmd.qualified_name, cmd.help or "—"))
+            yield (
+                f"{cmd.qualified_name} {cmd.signature}".strip(),
+                HELP_OVERRIDES.get(cmd.qualified_name, cmd.help or "—"),
+            )
+
+    for cmd in cog.get_commands():
+        yield from walk(cmd)
 
 def _build_overview(bot: commands.Bot) -> ui.Container:
     c = ui.Container(accent_colour=nui.BLURPLE)

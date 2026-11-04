@@ -187,34 +187,28 @@ async def build_suggestion_container(bot: commands.Bot, suggestion: dict) -> ui.
     view = ui.LayoutView(timeout=None)
     c = ui.Container()
 
-    header = ui.TextDisplay(f"{E.STAR} **New Suggestion**\n\n> {suggestion['text']}")
+    author_name = author.display_name if author else f"User {suggestion['author_id']}"
+    header = ui.TextDisplay(
+        f"**Suggested by {author_name}**\n\n> {suggestion['text']}"
+    )
     if avatar_url:
         c.add_item(ui.Section(header, accessory=ui.Thumbnail(media=discord.UnfurledMediaItem(url=avatar_url))))
     else:
         c.add_item(header)
 
     status_icon = STATUS_EMOJI.get(status, E.INFO)
-    body = (
-        f"{E.PERSON} **Suggested by:** {author_label}\n"
-        f"{E.LOADING} **Date:** <t:{suggestion.get('created_at') or 0}:F>\n"
-        f"{E.UTILITY} **User ID:** `{suggestion['author_id']}`\n"
-        f"{status_icon} **Status:** {STATUS_LABELS.get(status, status)}"
-    )
     if suggestion.get("mod_note"):
-        body += f"\n{E.INFO} **Mod note:** {suggestion['mod_note']}"
-    c.add_item(ui.TextDisplay(body))
-    c.add_item(ui.Separator())
+        c.add_item(ui.TextDisplay(f"> {E.INFO} **Mod note:** {suggestion['mod_note']}"))
 
-    c.add_item(ui.TextDisplay(nui.lead(
-        "INFO", "**Cast Your Vote**\nWhat do you think about this suggestion? Vote below."
-    )))
+    c.add_item(ui.Separator(visible=False))
+    c.add_item(ui.TextDisplay("**Cast Your Vote Below!**"))
 
     up_btn = ui.Button(
-        label=f"Yes ({up})", style=discord.ButtonStyle.success,
+        label=f"Support ({up})", style=discord.ButtonStyle.success,
         custom_id="sugg_upvote", emoji=E.TICK or None,
     )
     down_btn = ui.Button(
-        label=f"No ({down})", style=discord.ButtonStyle.danger,
+        label=f"Oppose ({down})", style=discord.ButtonStyle.danger,
         custom_id="sugg_downvote", emoji=E.CROSS or None,
     )
 
@@ -228,6 +222,10 @@ async def build_suggestion_container(bot: commands.Bot, suggestion: dict) -> ui.
     down_btn.callback = _down_cb
 
     c.add_item(ui.ActionRow(up_btn, down_btn))
+    c.add_item(ui.TextDisplay(
+        f"-# {E.PERSON} {author_label} • {status_icon} {STATUS_LABELS.get(status, status)} • "
+        f"<t:{suggestion.get('created_at') or 0}:R>"
+    ))
 
     view.add_item(c)
     return view
@@ -251,11 +249,11 @@ class SuggestionVoteRouter(ui.LayoutView):
         super().__init__(timeout=None)
         c = ui.Container()
         up_btn = ui.Button(
-            label="Yes", style=discord.ButtonStyle.success,
+            label="Support", style=discord.ButtonStyle.success,
             custom_id="sugg_upvote", emoji=E.TICK or None,
         )
         down_btn = ui.Button(
-            label="No", style=discord.ButtonStyle.danger,
+            label="Oppose", style=discord.ButtonStyle.danger,
             custom_id="sugg_downvote", emoji=E.CROSS or None,
         )
         up_btn.callback = self.on_upvote

@@ -84,6 +84,48 @@ def _stars(rating: int) -> str:
     rating = max(1, min(5, rating))
     return (ES("star_full") * rating) + (ES("star_empty") * (5 - rating))
 
+def build_feedback_card(
+    user: discord.abc.User,
+    review: str,
+    rating: int,
+    screenshot: str | None = None,
+) -> ui.LayoutView:
+    """The feedback card: 'Feedback by <name>', quoted review, rating stars,
+    avatar thumbnail, and a 'Submit a Review' button underneath."""
+    view = ui.LayoutView()
+    c = ui.Container()
+
+    header = ui.TextDisplay(
+        f"**Feedback by {user.display_name}**\n\n"
+        f"> {review}\n\n"
+        f"**Rating**\n{_stars(rating)}"
+    )
+    c.add_item(ui.Section(
+        header,
+        accessory=ui.Thumbnail(media=discord.UnfurledMediaItem(url=str(user.display_avatar.url))),
+    ))
+    c.add_item(ui.TextDisplay(
+        f"-# {E.PERSON} {user} • `{user.id}` • <t:{int(discord.utils.utcnow().timestamp())}:R>"
+    ))
+    if screenshot and screenshot.startswith(("http://", "https://")):
+        gallery = ui.MediaGallery()
+        gallery.add_item(media=discord.UnfurledMediaItem(url=screenshot))
+        c.add_item(gallery)
+    view.add_item(c)
+
+    review_btn = ui.Button(
+        label="Submit a Review", style=discord.ButtonStyle.secondary,
+        custom_id="fb_write_review", emoji=E.STAR or None,
+    )
+
+    async def _open_modal(i: discord.Interaction):
+        await i.response.send_modal(FeedbackModal())
+
+    review_btn.callback = _open_modal
+    view.add_item(ui.ActionRow(review_btn))
+    return view
+
+
 class FeedbackModal(ui.Modal, title="Submit Feedback"):
     def __init__(self):
         super().__init__()
@@ -127,35 +169,9 @@ class FeedbackModal(ui.Modal, title="Submit Feedback"):
         screenshot = self.screenshot_in.value.strip() or None
         await save_entry(interaction.guild.id, interaction.user.id, rating, self.review_in.value.strip(), screenshot)
 
-        view = ui.LayoutView()
-        c = ui.Container()
-        header = ui.TextDisplay(
-            f"{E.STAR} **New Feedback**\n\n> {self.review_in.value.strip()}\n\n{_stars(rating)}  {rating} / 5"
+        view = build_feedback_card(
+            interaction.user, self.review_in.value.strip(), rating, screenshot
         )
-        c.add_item(ui.Section(header, accessory=ui.Thumbnail(media=discord.UnfurledMediaItem(url=str(interaction.user.display_avatar.url)))))
-        c.add_item(ui.TextDisplay(
-            f"{E.PERSON} {interaction.user}\n"
-            f"{E.UTILITY} User ID: `{interaction.user.id}`\n"
-            f"{E.LOADING} <t:{int(discord.utils.utcnow().timestamp())}:F>"
-        ))
-        if screenshot and screenshot.startswith(("http://", "https://")):
-            c.add_item(ui.Separator())
-            gallery = ui.MediaGallery()
-            gallery.add_item(media=discord.UnfurledMediaItem(url=screenshot))
-            c.add_item(gallery)
-        c.add_item(ui.Separator())
-        leave_btn = ui.Button(
-            label="Leave a review too", style=discord.ButtonStyle.primary,
-            custom_id="fb_write_review", emoji=E.STAR or None,
-        )
-
-        async def _open_modal(i: discord.Interaction):
-            await i.response.send_modal(FeedbackModal())
-
-        leave_btn.callback = _open_modal
-        c.add_item(ui.ActionRow(leave_btn))
-        view.add_item(c)
-
         await channel.send(view=view)
         await interaction.response.send_message(
             view=_status_view(True, f"{_stars(rating)} Thanks! Your feedback was submitted."),
@@ -176,7 +192,7 @@ class FeedbackPanelView(ui.LayoutView):
             )
         ))
         btn = ui.Button(
-            label="Write Your Review", style=discord.ButtonStyle.primary,
+            label="Submit a Review", style=discord.ButtonStyle.secondary,
             custom_id="fb_write_review", emoji=E.STAR or None,
         )
         btn.callback = self.on_write
