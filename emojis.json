@@ -1,0 +1,14 @@
+{
+  "_comment": "CodeZ Manager does not use any emojis, custom or unicode. All values are intentionally blank.",
+
+  "SUCCESS": "",
+  "ERROR": "",
+  "ONLINE": "",
+
+  "TEAM_AVAILABLE": "<:online:1449604401068245023>",
+  "TEAM_UNAVAILABLE": "<:antinuke_nope:1441072868225056822>",
+  "TEAM_WARNING": "<:dot_red:1493869445205069915>",
+
+  "STAR_FULL": "*",
+  "STAR_EMPTY": "-"
+}
