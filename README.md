@@ -1,4 +1,4 @@
-# CodeZ Manager
+# NULL Manager
 
 A Discord bot for server moderation, tickets, and staff team management,
 built for the **NullDev** community — [dc.definescloud.site](https://dc.definescloud.site).
