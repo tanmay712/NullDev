@@ -2,10 +2,10 @@ import asyncio
 import logging
 
 import discord
-from discord import ui
 from discord.ext import commands
 
 import config
+from codezmanager import ui as nui
 
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s: %(message)s")
 log = logging.getLogger("codezmanager")
@@ -54,6 +54,7 @@ class CodeZManager(commands.Bot):
         await emoji_store.init_db()
 
         for ext in (
+            "cogs.nulldev",
             "cogs.greet",
             "cogs.suggestions",
             "cogs.moderation",
@@ -72,6 +73,7 @@ class CodeZManager(commands.Bot):
 
         log.info("Cogs loaded: %s", ", ".join(self.cogs.keys()))
         log.info("Prefix is %r — commands look like: %shelp, %sping", config.DEFAULT_PREFIX, config.DEFAULT_PREFIX, config.DEFAULT_PREFIX)
+        log.info("Community: %s — %s", config.BRAND_NAME, config.SUPPORT_SERVER_URL)
 
         if config.SLASH_SYNC_GUILD_ID:
             guild = discord.Object(id=config.SLASH_SYNC_GUILD_ID)
@@ -85,36 +87,39 @@ class CodeZManager(commands.Bot):
     async def on_ready(self):
         log.info("Logged in as %s (%s)", self.user, self.user.id)
         await self.change_presence(
-            activity=discord.Activity(type=discord.ActivityType.watching, name=f"{config.DEFAULT_PREFIX}help")
+            activity=discord.Activity(
+                type=discord.ActivityType.watching,
+                name=f"{config.DEFAULT_PREFIX}help • {config.BRAND_NAME}",
+            )
         )
+        log.info("NullDev emoji slots loaded: %s", ", ".join(sorted(nui.E.keys())))
 
     async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
         if isinstance(error, commands.CommandNotFound):
             return
 
         if isinstance(error, commands.NotOwner):
-            text = "Only the bot owner can use this command."
+            text = nui.lead("WARNING", "Only the bot owner can use this command.")
         elif isinstance(error, commands.MissingPermissions):
-            text = f"You need: `{', '.join(error.missing_permissions)}`"
+            text = nui.lead("WARNING", f"You need: `{', '.join(error.missing_permissions)}`")
         elif isinstance(error, commands.BotMissingPermissions):
-            text = f"I need: `{', '.join(error.missing_permissions)}`"
+            text = nui.lead("WARNING", f"I need: `{', '.join(error.missing_permissions)}`")
         elif isinstance(error, commands.MissingRequiredArgument):
-            text = f"Missing argument: `{error.param.name}`. Try `{config.DEFAULT_PREFIX}help`."
+            text = nui.lead(
+                "INFO",
+                f"Missing argument: `{error.param.name}`. Try `{config.DEFAULT_PREFIX}help`.",
+            )
         elif isinstance(error, commands.BadArgument):
-            text = f"Bad argument: {error}"
+            text = nui.lead("ERROR", f"Bad argument: {error}")
         elif isinstance(error, commands.NoPrivateMessage):
-            text = "That only works inside a server."
+            text = nui.lead("INFO", "That only works inside a server.")
         elif isinstance(error, commands.CommandOnCooldown):
-            text = f"Slow down — try again in {error.retry_after:.1f}s."
+            text = nui.lead("LOADING", f"Slow down — try again in {error.retry_after:.1f}s.")
         else:
             log.exception("Unhandled command error in %s: %r", ctx.command, error, exc_info=error)
-            text = f"Something went wrong running that command: `{error}`"
+            text = nui.lead("ERROR", f"Something went wrong running that command: `{error}`")
 
-        view = ui.LayoutView()
-        c = ui.Container()
-        c.add_item(ui.TextDisplay(text))
-        view.add_item(c)
-        await ctx.send(view=view)
+        await ctx.send(view=nui.simple_view(text, accent=nui.RED))
 
 async def main():
     if not config.TOKEN:

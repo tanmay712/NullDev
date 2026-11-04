@@ -4,37 +4,36 @@ import discord
 from discord import app_commands, ui
 from discord.ext import commands
 
+import config as cfgmod
 from codezmanager import emoji_store
+from codezmanager import ui as nui
+from codezmanager.emojis import E
 
 PER_PAGE = 3  # categories per page, matches the screenshot's 2-page layout
 
 
-def _view(text: str) -> ui.LayoutView:
-    view = ui.LayoutView()
-    container = ui.Container()
-    container.add_item(ui.TextDisplay(text))
-    view.add_item(container)
-    return view
+def _view(text: str, ok: bool | None = None) -> ui.LayoutView:
+    return nui.simple_view(text, ok=ok)
 
 
 def _build_page_text(bot_user: discord.ClientUser, pages: list[list[dict]], page: int, guild: discord.Guild) -> str:
-    lines = [f"### About {bot_user.mention}", ""]
+    lines = [f"### {E.PERSON} About {bot_user.mention}", ""]
 
     for cat in pages[page]:
         role = guild.get_role(cat["role_id"])
-        lines.append(f"**{cat['label']}**")
+        lines.append(f"{E.STAR} **{cat['label']}**")
         if role is None:
-            lines.append("*Role not found*")
+            lines.append(f"{E.WARNING} *Role not found*")
         else:
             members = [m for m in role.members if not m.bot]
             if not members:
-                lines.append("*Vacant*")
+                lines.append(f"{E.OFFLINE} *Vacant*")
             else:
                 for m in members:
-                    lines.append(f"{m.mention}")
+                    lines.append(f"{E.TICK} {m.mention}")
         lines.append("")
 
-    lines.append(f"Page {page + 1}/{len(pages)}")
+    lines.append(f"-# {E.LOADING} Page {page + 1}/{len(pages)} · {cfgmod.BRAND_NAME} — {cfgmod.SUPPORT_SERVER_URL}")
     return "\n".join(lines)
 
 
@@ -58,6 +57,7 @@ class AboutPager(ui.LayoutView):
         self.next_button.callback = self._go_next
         self.action_row.add_item(self.prev_button)
         self.action_row.add_item(self.next_button)
+        self.action_row.add_item(nui.support_button())
         self.container.add_item(self.action_row)
 
     def _text(self) -> str:
@@ -94,7 +94,7 @@ class About(commands.Cog):
     async def about(self, interaction: discord.Interaction):
         if interaction.guild is None:
             await interaction.response.send_message(
-                view=_view("This only works inside a server."), ephemeral=True
+                view=_view("This only works inside a server.", ok=False), ephemeral=True
             )
             return
 
@@ -102,8 +102,12 @@ class About(commands.Cog):
         if not categories:
             await interaction.response.send_message(
                 view=_view(
-                    "No staff categories are set up yet. "
-                    "An owner can add one with `/aboutsetup addcategory`."
+                    nui.lead(
+                        "WARNING",
+                        "No staff categories are set up yet. "
+                        "An owner can add one with `/aboutsetup addcategory`.",
+                    ),
+                    ok=False,
                 ),
                 ephemeral=True,
             )
@@ -120,13 +124,17 @@ class About(commands.Cog):
     async def addcategory(self, interaction: discord.Interaction, label: str, role: discord.Role):
         if not await self.bot.is_owner(interaction.user):
             await interaction.response.send_message(
-                view=_view("Only the bot owner can use this command."), ephemeral=True
+                view=_view(nui.lead("WARNING", "Only the bot owner can use this command."), ok=False),
+                ephemeral=True,
             )
             return
 
         await emoji_store.set_category(interaction.guild.id, label.strip(), role.id)
         await interaction.response.send_message(
-            view=_view(f"`{label.strip()}` now lists members of {role.mention} in `/about`."),
+            view=_view(
+                nui.lead("SUCCESS", f"`{label.strip()}` now lists members of {role.mention} in `/about`."),
+                ok=None,
+            ),
             ephemeral=True,
         )
 
@@ -135,18 +143,21 @@ class About(commands.Cog):
     async def removecategory(self, interaction: discord.Interaction, label: str):
         if not await self.bot.is_owner(interaction.user):
             await interaction.response.send_message(
-                view=_view("Only the bot owner can use this command."), ephemeral=True
+                view=_view(nui.lead("WARNING", "Only the bot owner can use this command."), ok=False),
+                ephemeral=True,
             )
             return
 
         removed = await emoji_store.remove_category(interaction.guild.id, label.strip())
         if removed:
             await interaction.response.send_message(
-                view=_view(f"Removed the `{label.strip()}` category."), ephemeral=True
+                view=_view(nui.lead("SUCCESS", f"Removed the `{label.strip()}` category.")),
+                ephemeral=True,
             )
         else:
             await interaction.response.send_message(
-                view=_view(f"No category named `{label.strip()}` was found."), ephemeral=True
+                view=_view(nui.lead("ERROR", f"No category named `{label.strip()}` was found."), ok=False),
+                ephemeral=True,
             )
 
     @about_group.command(name="listcategories", description="List all configured /about categories.")
@@ -154,15 +165,16 @@ class About(commands.Cog):
         categories = await emoji_store.list_categories(interaction.guild.id)
         if not categories:
             await interaction.response.send_message(
-                view=_view("No categories are set up yet."), ephemeral=True
+                view=_view(nui.lead("WARNING", "No categories are set up yet."), ok=False),
+                ephemeral=True,
             )
             return
 
-        lines = ["### /about Categories", ""]
+        lines = [f"### {E.UTILITY} /about Categories", ""]
         for cat in categories:
             role = interaction.guild.get_role(cat["role_id"])
-            role_text = role.mention if role else "*role not found*"
-            lines.append(f"**{cat['label']}** -> {role_text}")
+            role_text = role.mention if role else nui.lead("WARNING", "*role not found*")
+            lines.append(f"{E.TICK} **{cat['label']}** -> {role_text}")
         await interaction.response.send_message(view=_view("\n".join(lines)), ephemeral=True)
 
 

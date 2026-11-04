@@ -8,7 +8,9 @@ import discord
 from discord import ui
 from discord.ext import commands
 
+from codezmanager.emojis import E
 from codezmanager.emojis import E as _EMGR
+from codezmanager import ui as nui
 import config as cfgmod
 
 MAX_CHANNELS = 3
@@ -18,10 +20,15 @@ DB_PATH = DB_DIR / "greet.db"
 
 VALID_MODES = ("simple", "container")
 
-DEFAULT_SIMPLE_MSG = "Welcome {user} to **{server}**! You're member #{member_count}."
-DEFAULT_TITLE = "Welcome to {server}!"
-DEFAULT_DESC = "Hey {user}, welcome to **{server}**! You are member **#{member_count}**.\nEnjoy your stay!"
-DEFAULT_FOOTER = "Member #{member_number} • Joined {join_time}"
+# The NullDev emoji set is baked into the default template so a freshly added
+# greet channel still looks branded. Admins can of course replace it.
+DEFAULT_SIMPLE_MSG = E.FLOWERS + " Welcome {user} to **{server}**! You're member #{member_count}."
+DEFAULT_TITLE = E.FLOWERS + " Welcome to {server}!"
+DEFAULT_DESC = (
+    E.STAR + " Hey {user}, welcome to **{server}**! You are member **#{member_count}**.\n"
+    + E.GIFT + " Enjoy your stay!"
+)
+DEFAULT_FOOTER = E.PERSON + " Member #{member_number} • Joined {join_time}"
 
 _LOCAL_KEY_MAP = {"success": "SUCCESS", "error": "ERROR"}
 
@@ -138,11 +145,7 @@ VARIABLES_HELP = (
 )
 
 def _status_view(ok: bool, text: str) -> ui.LayoutView:
-    view = ui.LayoutView()
-    c = ui.Container()
-    c.add_item(ui.TextDisplay(text))
-    view.add_item(c)
-    return view
+    return nui.simple_view(text, ok=ok)
 
 def _build_simple_content(cfg: dict, member: discord.Member) -> str:
     raw = cfg.get("content") or DEFAULT_SIMPLE_MSG
@@ -280,19 +283,19 @@ class Greet(commands.Cog):
         view = ui.LayoutView(timeout=300)
         c = ui.Container()
 
-        c.add_item(ui.TextDisplay("**Greet Control Panel**"))
+        c.add_item(ui.TextDisplay(nui.lead("FLOWERS", "**Greet Control Panel**")))
         c.add_item(ui.Separator())
 
         if not channels:
-            c.add_item(ui.TextDisplay("No greet channels configured yet. Pick one below to add."))
+            c.add_item(ui.TextDisplay(nui.lead("WARNING", "No greet channels configured yet. Pick one below to add.")))
         else:
             lines = []
             for row in channels:
                 ch = guild.get_channel(row["channel_id"])
-                status = "Enabled" if row["enabled"] else "Disabled"
+                status = (E.TICK + " Enabled") if row["enabled"] else (E.CROSS + " Disabled")
                 ch_label = ch.mention if ch else f"`#{row['channel_id']}`"
                 extra = f" • auto-delete {row['autodelete']}s" if row["autodelete"] else ""
-                lines.append(f"{status} {ch_label} — mode: `{row['mode']}`{extra}")
+                lines.append(f"{status} {ch_label} — {E.LOADING} mode: `{row['mode']}`{extra}")
             c.add_item(ui.TextDisplay("\n".join(lines)))
 
         c.add_item(ui.Separator(visible=False))
@@ -345,7 +348,7 @@ class Greet(commands.Cog):
 
         c.add_item(ui.ActionRow(add_select))
         c.add_item(ui.ActionRow(manage_select))
-        c.add_item(ui.TextDisplay(f"-# Use `{cfgmod.DEFAULT_PREFIX}greet variables` to see template variables"))
+        c.add_item(ui.TextDisplay(nui.footer_line(f"Use `{cfgmod.DEFAULT_PREFIX}greet variables` to see template variables")))
 
         view.add_item(c)
         return view
@@ -359,13 +362,13 @@ class Greet(commands.Cog):
         view = ui.LayoutView(timeout=300)
         c = ui.Container()
 
-        c.add_item(ui.TextDisplay(f"**Configuring** {ch.mention if ch else '#unknown'}"))
+        c.add_item(ui.TextDisplay(nui.lead("UTILITY", f"**Configuring** {ch.mention if ch else '#unknown'}")))
         c.add_item(ui.Separator())
         c.add_item(ui.TextDisplay(
-            f"**Status:** {'Enabled' if enabled else 'Disabled'}\n"
-            f"**Mode:** `{mode}`\n"
-            f"**Thumbnail:** {'on' if cur.get('thumbnail_on', 1) else 'off'}\n"
-            f"**Auto-delete:** {cur.get('autodelete') or 0}s"
+            f"**Status:** {(E.TICK + ' Enabled') if enabled else (E.CROSS + ' Disabled')}\n"
+            f"**Mode:** {E.LOADING} `{mode}`\n"
+            f"**Thumbnail:** {(E.TICK + ' on') if cur.get('thumbnail_on', 1) else (E.CROSS + ' off')}\n"
+            f"**Auto-delete:** {E.LOADING} {cur.get('autodelete') or 0}s"
         ))
         c.add_item(ui.Separator(visible=False))
 
@@ -377,20 +380,30 @@ class Greet(commands.Cog):
             ],
         )
 
-        edit_btn = ui.Button(label="Edit Text", style=discord.ButtonStyle.primary, custom_id="gp_edit")
-        appearance_btn = ui.Button(label="Appearance", style=discord.ButtonStyle.primary, custom_id="gp_app")
+        edit_btn = ui.Button(
+            label="Edit Text", style=discord.ButtonStyle.primary, custom_id="gp_edit", emoji=E.UTILITY or None
+        )
+        appearance_btn = ui.Button(
+            label="Appearance", style=discord.ButtonStyle.primary, custom_id="gp_app", emoji=E.STAR or None
+        )
         thumb_btn = ui.Button(
             label="Thumbnail Off" if cur.get("thumbnail_on", 1) else "Thumbnail On",
-            style=discord.ButtonStyle.secondary, custom_id="gp_thumb",
+            style=discord.ButtonStyle.secondary, custom_id="gp_thumb", emoji=E.PERSON or None,
         )
         toggle_btn = ui.Button(
             label="Disable" if enabled else "Enable",
             style=discord.ButtonStyle.danger if enabled else discord.ButtonStyle.success,
-            custom_id="gp_toggle",
+            custom_id="gp_toggle", emoji=(E.CROSS if enabled else E.TICK) or None,
         )
-        test_btn = ui.Button(label="Test", style=discord.ButtonStyle.secondary, custom_id="gp_test")
-        remove_btn = ui.Button(label="Remove Channel", style=discord.ButtonStyle.danger, custom_id="gp_remove")
-        back_btn = ui.Button(label="◂ Back", style=discord.ButtonStyle.secondary, custom_id="gp_back")
+        test_btn = ui.Button(
+            label="Test", style=discord.ButtonStyle.secondary, custom_id="gp_test", emoji=E.TICK or None
+        )
+        remove_btn = ui.Button(
+            label="Remove Channel", style=discord.ButtonStyle.danger, custom_id="gp_remove", emoji=E.WARNING or None
+        )
+        back_btn = ui.Button(
+            label="◂ Back", style=discord.ButtonStyle.secondary, custom_id="gp_back", emoji=E.HOME or None
+        )
 
         async def _guard(interaction: discord.Interaction) -> bool:
             if not interaction.user.guild_permissions.manage_guild:
@@ -442,7 +455,10 @@ class Greet(commands.Cog):
             try:
                 await interaction.response.defer(ephemeral=True)
                 await self.send_greet(ch, interaction.user, fresh)
-                await interaction.followup.send(view=_status_view(True, f"Test sent to {ch.mention}"), ephemeral=True)
+                await interaction.followup.send(
+                    view=_status_view(True, nui.lead("GIFT", f"Test greet sent to {ch.mention}")),
+                    ephemeral=True,
+                )
             except Exception as e:
                 await interaction.followup.send(view=_status_view(False, f"Failed: `{e}`"), ephemeral=True)
 
@@ -581,9 +597,11 @@ class Greet(commands.Cog):
     async def greet_variables(self, ctx: commands.Context):
         view = ui.LayoutView()
         c = ui.Container()
-        c.add_item(ui.TextDisplay("**Available Variables**"))
+        c.add_item(ui.TextDisplay(nui.lead("INFO", "**Available Variables**")))
         c.add_item(ui.Separator())
         c.add_item(ui.TextDisplay(VARIABLES_HELP))
+        c.add_item(ui.Separator(visible=False))
+        c.add_item(ui.TextDisplay(nui.footer_line(f"{cfgmod.BRAND_NAME} greet templates")))
         view.add_item(c)
         await ctx.send(view=view)
 

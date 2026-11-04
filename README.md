@@ -1,6 +1,7 @@
 # CodeZ Manager
 
-A Discord bot for server moderation, tickets, and staff team management.
+A Discord bot for server moderation, tickets, and staff team management,
+built for the **NullDev** community — [dc.definescloud.site](https://dc.definescloud.site).
 
 ## Setup
 
@@ -20,10 +21,55 @@ A Discord bot for server moderation, tickets, and staff team management.
 The default prefix is `Cz!` and is case-insensitive — `cz!`, `Cz!`, and `CZ!`
 all work. You can change it by setting `PREFIX` in your `.env` file.
 
+## NullDev community
+
+The bot is branded for NullDev and links back to the Discord everywhere:
+
+- `Cz!discord` (aliases `Cz!nulldev`, `Cz!dc`, `Cz!server`, `Cz!community`)
+  and `/discord` post a NullDev card with a **Join NullDev** button.
+- `Cz!invite` (aliases `Cz!botinvite`, `Cz!addbot`) posts the bot's own
+  invite link so other servers can add it.
+- The link also appears in `Cz!help`, `/about`, the ticket panel, the feedback
+  panel and the footer of most panels.
+
+Change the link or the name without touching code:
+
+```
+BRAND_NAME=NullDev
+SUPPORT_SERVER_URL=https://dc.definescloud.site
+```
+
+## Emojis
+
+The bot uses the NullDev custom emoji set all over the UI — status messages,
+panel headers, buttons, selections, footers and the welcome messages. They are
+declared once in `emojis.json` and read through `codezmanager.emojis.E`, with
+`codezmanager.ui` providing the shared helpers (`lead()`, `simple_view()`,
+`status_emoji()`, `support_button()`, `footer_line()`).
+
+| Slot | Emoji | Used for |
+| --- | --- | --- |
+| `NULLDEV`, `HOME` | `A_Home` | brand, footer links, back buttons |
+| `PERSON` | `Person` | users, staff, claim buttons |
+| `ONLINE` | `Online2` | online status, success headers |
+| `IDLE`, `LOADING` | `Loadings` | idle presence, timers, "working…" |
+| `DND` | `_DND` | do-not-disturb presence, mutes |
+| `OFFLINE`, `ERROR`, `CROSS` | `cross_cross` | offline presence, failures, close buttons |
+| `SUCCESS`, `TICK` | `tick_tick` | successful commands, yes votes |
+| `INFO` | `info2` | tips, help text, informational panels |
+| `WARNING` | `warninga` | permission problems, staff warnings |
+| `STAR`, `STAR_FULL` | `stars_star` | feedback ratings, suggestions |
+| `GIFT` | `st_gift` | greetings, tickets |
+| `FLOWERS` | `flowerss` | welcome messages |
+| `GAMES` | `cb_games` | voice stay, community panels |
+| `UTILITY` | `utility_` | settings, IDs, tool buttons |
+
+Status messages automatically get a green accent + tick or a red accent + cross
+through `codezmanager.ui.simple_view()`. Anything uploaded with `/emoji upload`
+overrides the literal in `emojis.json` via `emojis.uploaded.json`.
+
 ## Notes on this build
 
-- No emojis are used anywhere in this bot — not custom Discord emojis, not
-  unicode emojis. Status indicators use plain text/words instead.
 - The bot needs the **Server Members**, **Message Content**, and
   **Presence** privileged intents enabled in the Discord Developer Portal
   for member tracking, moderation, and online/offline status features to
@@ -32,12 +78,44 @@ all work. You can change it by setting `PREFIX` in your `.env` file.
 ## Feature overview
 
 ### Tickets
-- `Cz!ticket panel` — posts a panel with an "Open Ticket" button.
-- `Cz!ticket category <#category>` — where new ticket channels are created.
-- `Cz!ticket role <@role>` — support role that can see/manage tickets.
-- `Cz!ticket logs <#channel>` — where closed-ticket transcripts are posted.
-- `Cz!ticket close` — closes the current ticket channel.
+`Cz!ticket panel` posts a branded panel with a **Select a ticket category...**
+dropdown, exactly like the reference design:
+
+    N U L L D E V
+
+    > Please create tickets in the correct category.
+
+    Read this first:
+    > We've had way too many tickets like that.
+    > Please be literate and use the right category.
+
+    [ Select a ticket category...  v ]
+
+- Picking an option opens a private channel named `ticket-0001-<key>` in that
+  category's channel category, with that category's support role added.
+- `Cz!ticket type add <key> <label> [#category] [@role] [emoji]` — add or
+  update a dropdown option (up to 25). Example:
+  `Cz!ticket type add bug "Bug Report" #Bugs @Developer`
+- `Cz!ticket type remove <key>` / `Cz!ticket type list` — manage options.
+- `Cz!ticket note <line 1 | line 2>` — edit the "Read this first" text.
+- `Cz!ticket category <#category>` / `Cz!ticket role <@role>` — fallbacks used
+  when a dropdown option has no category/role of its own.
+- `Cz!ticket logs <#channel>` — where closed-ticket transcripts and summaries
+  are posted. `Cz!ticket close` closes the current ticket.
+- The first panel seeds five default categories (General Support, Report a User,
+  Appeal a Punishment, Partnership, Other) so the dropdown works immediately.
 - Each ticket channel gets Claim/Unclaim and Close Ticket buttons.
+
+### Suggestions
+Every suggestion is posted as a card: the author's avatar, a quoted
+`Suggested by <name>` block, **Cast Your Vote Below!** and
+**Support (n)** / **Oppose (n)** buttons. Your own vote is toggled by clicking
+either button again.
+
+### Feedback
+`Cz!feedback panel` posts a **Submit a Review** button. A submitted review is
+posted as a card with the reviewer's avatar, the quoted review and a
+**Rating** row of NullDev stars, plus a **Submit a Review** button underneath.
 
 ### Team Setup (all commands are owner only)
 Shows which staff are available right now in a single panel, like:
@@ -58,8 +136,9 @@ Shows which staff are available right now in a single panel, like:
 staff member goes online/offline, until the day ends (UTC midnight). The next
 day it posts a fresh message and edits that one instead.
 
-**Custom emojis** (optional, max 3) go in `emojis.json`:
-`TEAM_AVAILABLE`, `TEAM_UNAVAILABLE`, `TEAM_WARNING`. Leave blank for none.
+**Custom emojis** for the panel come from `emojis.json`:
+`TEAM_AVAILABLE` (Online2), `TEAM_UNAVAILABLE` (cross_cross), `TEAM_WARNING`
+(warninga). Each listed member also gets their own presence emoji.
 
 ### Bot Access (owner only)
 Give trusted people access to the bot's action commands without giving them
@@ -131,12 +210,12 @@ Categories with nobody in the role show **Vacant**. Data is stored in
 
 ### Slash command sync
 On startup the bot syncs its slash commands (`/about`, `/aboutsetup`,
-`/emoji`). By default this syncs **globally**, which can take up to an hour
+`/emoji`, `/discord`). By default this syncs **globally**, which can take up to an hour
 to show up in Discord the first time. Set `SLASH_SYNC_GUILD_ID` in `.env` to
 one server ID while testing to get instant syncing in that server only.
 
 ### Everything else
-Greet/welcome messages, suggestions, feedback, bot-status tracking,
-voice-stay, and the display-name style tool (`tag`) are unchanged from the
-original bot aside from the renaming and emoji removal. Run `Cz!help` in
-your server for the full, up-to-date command list.
+Greet/welcome messages (the default templates are already NullDev-branded),
+suggestions, feedback, bot-status tracking, voice-stay, and the display-name
+style tool (`tag`) all use the NullDev emoji set. Run `Cz!help` in your
+server for the full, up-to-date command list.

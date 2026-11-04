@@ -7,8 +7,10 @@ import discord
 from discord import ui
 from discord.ext import commands, tasks
 
+from codezmanager.emojis import E
 from codezmanager.emojis import E as _EMGR
 from codezmanager import access
+from codezmanager import ui as nui
 import config as cfgmod
 
 DB_DIR = Path("db")
@@ -28,11 +30,8 @@ def ES(key: str) -> str:
     return _EMGR[_LOCAL_KEY_MAP.get(key, key.upper())]
 
 def _status_view(ok: bool, text: str) -> ui.LayoutView:
-    view = ui.LayoutView()
-    c = ui.Container()
-    c.add_item(ui.TextDisplay(text))
-    view.add_item(c)
-    return view
+    """Green + NullDev tick on success, red + NullDev cross on failure."""
+    return nui.simple_view(text, ok=ok)
 
 def _ensure_db():
     DB_DIR.mkdir(exist_ok=True)
@@ -103,26 +102,35 @@ async def build_panel_view(bot: commands.Bot, guild: discord.Guild) -> ui.Layout
 
     view = ui.LayoutView(timeout=None)
     c = ui.Container()
-    c.add_item(ui.TextDisplay("### ZD Status\nReal-time bot status monitor"))
+    c.add_item(ui.TextDisplay(
+        f"### {E.LOADING} ZD Status\n-# Real-time bot status monitor"
+    ))
     c.add_item(ui.Separator())
 
     if not tracked_ids:
-        c.add_item(ui.TextDisplay(f"No bots tracked yet. Use `{cfgmod.DEFAULT_PREFIX}tracker add @bot`."))
+        c.add_item(ui.TextDisplay(nui.lead(
+            "INFO", f"No bots tracked yet. Use `{cfgmod.DEFAULT_PREFIX}tracker add @bot`."
+        )))
     else:
-        c.add_item(ui.TextDisplay("__**Bot Status**__"))
+        c.add_item(ui.TextDisplay(nui.lead("ONLINE", "__**Bot Status**__")))
         for bot_id in tracked_ids:
             member = guild.get_member(bot_id)
             if not member:
-                text = ui.TextDisplay(f"## Unknown Bot\n**ID:** `{bot_id}`\n**Status:** Not in server")
+                text = ui.TextDisplay(
+                    nui.lead(
+                        "WARNING",
+                        f"## Unknown Bot\n{E.UTILITY} **ID:** `{bot_id}`\n{E.OFFLINE} **Status:** Not in server",
+                    )
+                )
                 c.add_item(text)
                 continue
             label = STATUS_LABEL.get(member.status, "Offline")
-            status_prefix = ""
+            status_prefix = nui.status_emoji(member.status)
             text = ui.TextDisplay(
-                f"## {member.display_name}\n"
-                f"**Username:** @{member.name}\n"
-                f"**ID:** `{member.id}`\n"
-                f"**Status:** {status_prefix}{label}"
+                f"## {status_prefix} {member.display_name}\n"
+                f"{E.PERSON} **Username:** @{member.name}\n"
+                f"{E.UTILITY} **ID:** `{member.id}`\n"
+                f"{status_prefix} **Status:** {label}"
             )
             try:
                 section = ui.Section(
@@ -133,7 +141,11 @@ async def build_panel_view(bot: commands.Bot, guild: discord.Guild) -> ui.Layout
                 c.add_item(text)
 
     c.add_item(ui.Separator())
-    c.add_item(ui.TextDisplay(f"**Last Updated:** <t:{int(now.timestamp())}:T>\n**Tracked:** {len(tracked_ids)} bot(s)"))
+    c.add_item(ui.TextDisplay(
+        f"{E.LOADING} **Last Updated:** <t:{int(now.timestamp())}:T>\n"
+        f"{E.PERSON} **Tracked:** {len(tracked_ids)} bot(s)"
+    ))
+    c.add_item(ui.TextDisplay(nui.footer_line(f"{cfgmod.BRAND_NAME} status monitor")))
     view.add_item(c)
     return view
 
@@ -234,10 +246,13 @@ class BotStatusTracker(commands.Cog):
             return
 
         label = STATUS_LABEL.get(after.status, "Offline")
-        status_prefix = ""
+        status_prefix = nui.status_emoji(after.status)
         view = ui.LayoutView()
-        c = ui.Container()
-        c.add_item(ui.TextDisplay(f"{status_prefix}**{after.display_name}** is now **{label}**"))
+        c = ui.Container(accent_colour=nui.GREEN if after.status == discord.Status.online else nui.GREY)
+        c.add_item(ui.TextDisplay(
+            f"{status_prefix} **{after.display_name}** is now **{label}**\n"
+            f"-# {cfgmod.BRAND_NAME} — {cfgmod.SUPPORT_SERVER_URL}"
+        ))
         view.add_item(c)
         try:
             await channel.send(view=view)

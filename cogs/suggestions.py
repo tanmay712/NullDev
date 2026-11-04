@@ -7,8 +7,10 @@ import discord
 from discord import ui
 from discord.ext import commands
 
+from codezmanager.emojis import E
 from codezmanager.emojis import E as _EMGR
 from codezmanager import access
+from codezmanager import ui as nui
 import config as cfgmod
 
 DB_DIR = Path("db")
@@ -20,17 +22,21 @@ STATUS_LABELS = {
     "considered": "Under Consideration",
 }
 
+# NullDev emoji shown next to each suggestion status.
+STATUS_EMOJI = {
+    "pending": E.LOADING,
+    "approved": E.TICK,
+    "denied": E.CROSS,
+    "considered": E.INFO,
+}
+
 _LOCAL_KEY_MAP = {"success": "SUCCESS", "error": "ERROR"}
 
 def ES(key: str) -> str:
     return _EMGR[_LOCAL_KEY_MAP.get(key, key.upper())]
 
 def _status_view(ok: bool, text: str) -> ui.LayoutView:
-    view = ui.LayoutView()
-    c = ui.Container()
-    c.add_item(ui.TextDisplay(text))
-    view.add_item(c)
-    return view
+    return nui.simple_view(text, ok=ok)
 
 def _ensure_db():
     DB_DIR.mkdir(exist_ok=True)
@@ -181,27 +187,30 @@ async def build_suggestion_container(bot: commands.Bot, suggestion: dict) -> ui.
     view = ui.LayoutView(timeout=None)
     c = ui.Container()
 
-    header = ui.TextDisplay(f"**New Suggestion**\n\n> {suggestion['text']}")
+    author_name = author.display_name if author else f"User {suggestion['author_id']}"
+    header = ui.TextDisplay(
+        f"**Suggested by {author_name}**\n\n> {suggestion['text']}"
+    )
     if avatar_url:
         c.add_item(ui.Section(header, accessory=ui.Thumbnail(media=discord.UnfurledMediaItem(url=avatar_url))))
     else:
         c.add_item(header)
 
-    body = (
-        f"Suggested by: {author_label}\n"
-        f"Date: <t:{suggestion.get('created_at') or 0}:F>\n"
-        f"User ID: `{suggestion['author_id']}`\n"
-        f"Status: **{STATUS_LABELS.get(status, status)}**"
-    )
+    status_icon = STATUS_EMOJI.get(status, E.INFO)
     if suggestion.get("mod_note"):
-        body += f"\nMod note: {suggestion['mod_note']}"
-    c.add_item(ui.TextDisplay(body))
-    c.add_item(ui.Separator())
+        c.add_item(ui.TextDisplay(f"> {E.INFO} **Mod note:** {suggestion['mod_note']}"))
 
-    c.add_item(ui.TextDisplay("**Cast Your Vote**\nWhat do you think about this suggestion? Vote below."))
+    c.add_item(ui.Separator(visible=False))
+    c.add_item(ui.TextDisplay("**Cast Your Vote Below!**"))
 
-    up_btn = ui.Button(label=f"Yes ({up})", style=discord.ButtonStyle.success, custom_id="sugg_upvote")
-    down_btn = ui.Button(label=f"No ({down})", style=discord.ButtonStyle.danger, custom_id="sugg_downvote")
+    up_btn = ui.Button(
+        label=f"Support ({up})", style=discord.ButtonStyle.success,
+        custom_id="sugg_upvote", emoji=E.TICK or None,
+    )
+    down_btn = ui.Button(
+        label=f"Oppose ({down})", style=discord.ButtonStyle.danger,
+        custom_id="sugg_downvote", emoji=E.CROSS or None,
+    )
 
     async def _up_cb(interaction: discord.Interaction):
         await _handle_suggestion_vote(interaction, "up")
@@ -213,6 +222,10 @@ async def build_suggestion_container(bot: commands.Bot, suggestion: dict) -> ui.
     down_btn.callback = _down_cb
 
     c.add_item(ui.ActionRow(up_btn, down_btn))
+    c.add_item(ui.TextDisplay(
+        f"-# {E.PERSON} {author_label} • {status_icon} {STATUS_LABELS.get(status, status)} • "
+        f"<t:{suggestion.get('created_at') or 0}:R>"
+    ))
 
     view.add_item(c)
     return view
@@ -235,8 +248,14 @@ class SuggestionVoteRouter(ui.LayoutView):
     def __init__(self):
         super().__init__(timeout=None)
         c = ui.Container()
-        up_btn = ui.Button(label="Yes", style=discord.ButtonStyle.success, custom_id="sugg_upvote")
-        down_btn = ui.Button(label="No", style=discord.ButtonStyle.danger, custom_id="sugg_downvote")
+        up_btn = ui.Button(
+            label="Support", style=discord.ButtonStyle.success,
+            custom_id="sugg_upvote", emoji=E.TICK or None,
+        )
+        down_btn = ui.Button(
+            label="Oppose", style=discord.ButtonStyle.danger,
+            custom_id="sugg_downvote", emoji=E.CROSS or None,
+        )
         up_btn.callback = self.on_upvote
         down_btn.callback = self.on_downvote
         c.add_item(ui.ActionRow(up_btn, down_btn))
@@ -268,7 +287,9 @@ class Suggestions(commands.Cog):
                 name=f"{author.display_name} - Suggestion"[:100],
                 auto_archive_duration=1440,
             )
-            await thread.send(f"{author.mention} submitted a new suggestion. Discuss it here!")
+            await thread.send(nui.lead(
+                "STAR", f"{author.mention} submitted a new suggestion. Discuss it here!"
+            ))
         except discord.HTTPException:
             pass
 
@@ -368,7 +389,11 @@ class Suggestions(commands.Cog):
                 await msg.edit(view=await build_suggestion_container(self.bot, fresh))
             except discord.HTTPException:
                 pass
-        await ctx.send(view=_status_view(True, f"Suggestion #{suggestion['id']} marked **{STATUS_LABELS[status]}**."))
+        await ctx.send(view=_status_view(
+            True,
+            f"Suggestion #{suggestion['id']} marked {STATUS_EMOJI.get(status, '')} "
+            f"**{STATUS_LABELS[status]}**.",
+        ))
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Suggestions(bot))

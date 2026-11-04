@@ -7,16 +7,14 @@ from discord import app_commands, ui
 from discord.ext import commands
 
 from codezmanager import emoji_store
+from codezmanager import ui as nui
+from codezmanager.emojis import E
 
 _SLOT_RE = re.compile(r"^[A-Za-z0-9_]{2,32}$")
 
 
-def _view(text: str) -> ui.LayoutView:
-    view = ui.LayoutView()
-    container = ui.Container()
-    container.add_item(ui.TextDisplay(text))
-    view.add_item(container)
-    return view
+def _view(text: str, ok: bool | None = None) -> ui.LayoutView:
+    return nui.simple_view(text, ok=ok)
 
 
 class EmojiManager(commands.Cog):
@@ -39,7 +37,8 @@ class EmojiManager(commands.Cog):
         async def predicate(interaction: discord.Interaction) -> bool:
             if not await self.bot.is_owner(interaction.user):
                 await interaction.response.send_message(
-                    view=_view("Only the bot owner can use this command."), ephemeral=True
+                    view=_view(nui.lead("WARNING", "Only the bot owner can use this command."), ok=False),
+                    ephemeral=True,
                 )
                 return False
             return True
@@ -60,28 +59,32 @@ class EmojiManager(commands.Cog):
     ):
         if not await self.bot.is_owner(interaction.user):
             await interaction.response.send_message(
-                view=_view("Only the bot owner can use this command."), ephemeral=True
+                view=_view(nui.lead("WARNING", "Only the bot owner can use this command."), ok=False), ephemeral=True
             )
             return
 
         slot = slot.strip().upper()
         if not _SLOT_RE.match(slot):
             await interaction.response.send_message(
-                view=_view("Slot names must be 2-32 characters: letters, numbers, or underscore."),
+                view=_view("Slot names must be 2-32 characters: letters, numbers, or underscore.", ok=False),
                 ephemeral=True,
             )
             return
 
         if not _SLOT_RE.match(name) or name[0].isdigit():
             await interaction.response.send_message(
-                view=_view("Emoji name must be 2-32 characters: letters, numbers, or underscore, and can't start with a digit."),
+                view=_view(
+                    "Emoji name must be 2-32 characters: letters, numbers, or underscore, "
+                    "and can't start with a digit.",
+                    ok=False,
+                ),
                 ephemeral=True,
             )
             return
 
         if not (image.content_type or "").startswith("image/"):
             await interaction.response.send_message(
-                view=_view("That attachment isn't an image."), ephemeral=True
+                view=_view("That attachment isn't an image.", ok=False), ephemeral=True
             )
             return
 
@@ -92,13 +95,13 @@ class EmojiManager(commands.Cog):
             created = await self.bot.create_application_emoji(name=name, image=image_bytes)
         except discord.HTTPException as exc:
             await interaction.followup.send(
-                view=_view(f"Discord rejected the upload: `{exc.text if hasattr(exc, 'text') else exc}`"),
+                view=_view(f"Discord rejected the upload: `{exc.text if hasattr(exc, 'text') else exc}`", ok=False),
                 ephemeral=True,
             )
             return
         except Exception as exc:
             await interaction.followup.send(
-                view=_view(f"Upload failed: `{exc}`"), ephemeral=True
+                view=_view(f"Upload failed: `{exc}`", ok=False), ephemeral=True
             )
             return
 
@@ -111,7 +114,10 @@ class EmojiManager(commands.Cog):
         )
 
         await interaction.followup.send(
-            view=_view(f"Uploaded {created} and assigned it to slot `{slot}`."),
+            view=_view(
+                nui.lead("SUCCESS", f"Uploaded {created} and assigned it to slot `{slot}`."),
+                ok=None,
+            ),
             ephemeral=True,
         )
 
@@ -123,14 +129,14 @@ class EmojiManager(commands.Cog):
     async def emoji_assign(self, interaction: discord.Interaction, slot: str, emoji: str):
         if not await self.bot.is_owner(interaction.user):
             await interaction.response.send_message(
-                view=_view("Only the bot owner can use this command."), ephemeral=True
+                view=_view(nui.lead("WARNING", "Only the bot owner can use this command."), ok=False), ephemeral=True
             )
             return
 
         slot = slot.strip().upper()
         if not _SLOT_RE.match(slot):
             await interaction.response.send_message(
-                view=_view("Slot names must be 2-32 characters: letters, numbers, or underscore."),
+                view=_view("Slot names must be 2-32 characters: letters, numbers, or underscore.", ok=False),
                 ephemeral=True,
             )
             return
@@ -138,7 +144,10 @@ class EmojiManager(commands.Cog):
         m = re.match(r"^<(a)?:([A-Za-z0-9_]+):(\d+)>$", emoji.strip())
         if not m:
             await interaction.response.send_message(
-                view=_view("That doesn't look like a custom emoji. Paste the emoji itself, not its name."),
+                view=_view(
+                    "That doesn't look like a custom emoji. Paste the emoji itself, not its name.",
+                    ok=False,
+                ),
                 ephemeral=True,
             )
             return
@@ -148,7 +157,7 @@ class EmojiManager(commands.Cog):
             slot=slot, emoji_id=emoji_id, name=name, animated=animated, uploaded_by=interaction.user.id
         )
         await interaction.response.send_message(
-            view=_view(f"Assigned {emoji} to slot `{slot}`."), ephemeral=True
+            view=_view(nui.lead("SUCCESS", f"Assigned {emoji} to slot `{slot}`."), ok=None), ephemeral=True
         )
 
     @emoji_group.command(name="remove", description="Remove a slot's emoji assignment.")
@@ -156,7 +165,7 @@ class EmojiManager(commands.Cog):
     async def emoji_remove(self, interaction: discord.Interaction, slot: str):
         if not await self.bot.is_owner(interaction.user):
             await interaction.response.send_message(
-                view=_view("Only the bot owner can use this command."), ephemeral=True
+                view=_view(nui.lead("WARNING", "Only the bot owner can use this command."), ok=False), ephemeral=True
             )
             return
 
@@ -164,11 +173,12 @@ class EmojiManager(commands.Cog):
         removed = await emoji_store.remove_emoji(slot)
         if removed:
             await interaction.response.send_message(
-                view=_view(f"Removed the emoji assignment for slot `{slot}`."), ephemeral=True
+                view=_view(nui.lead("SUCCESS", f"Removed the emoji assignment for slot `{slot}`."), ok=None),
+                ephemeral=True,
             )
         else:
             await interaction.response.send_message(
-                view=_view(f"Slot `{slot}` has no uploaded emoji assigned."), ephemeral=True
+                view=_view(f"Slot `{slot}` has no uploaded emoji assigned.", ok=False), ephemeral=True
             )
 
     @emoji_group.command(name="list", description="List every slot with an assigned application emoji.")
@@ -176,14 +186,17 @@ class EmojiManager(commands.Cog):
         rows = await emoji_store.list_emojis()
         if not rows:
             await interaction.response.send_message(
-                view=_view("No slots have an uploaded emoji assigned yet."), ephemeral=True
+                view=_view(nui.lead("WARNING", "No slots have an uploaded emoji assigned yet."), ok=False),
+                ephemeral=True,
             )
             return
 
-        lines = ["### Assigned Emojis", ""]
+        lines = [f"### {E.UTILITY} Assigned Emojis", ""]
         for row in rows:
             literal = f"<{'a' if row['animated'] else ''}:{row['name']}:{row['emoji_id']}>"
-            lines.append(f"`{row['slot']}` -> {literal} (`{row['name']}`)")
+            lines.append(f"{E.TICK} `{row['slot']}` -> {literal} (`{row['name']}`)")
+        lines.append("")
+        lines.append(nui.footer_line(f"{len(rows)} slot(s) assigned"))
         await interaction.response.send_message(view=_view("\n".join(lines)), ephemeral=True)
 
     @emoji_group.command(name="sync", description="Delete an application emoji from Discord entirely (not just its slot).")
@@ -191,7 +204,7 @@ class EmojiManager(commands.Cog):
     async def emoji_sync_delete(self, interaction: discord.Interaction, slot: str):
         if not await self.bot.is_owner(interaction.user):
             await interaction.response.send_message(
-                view=_view("Only the bot owner can use this command."), ephemeral=True
+                view=_view(nui.lead("WARNING", "Only the bot owner can use this command."), ok=False), ephemeral=True
             )
             return
 
@@ -199,7 +212,7 @@ class EmojiManager(commands.Cog):
         row = await emoji_store.get_emoji(slot)
         if not row:
             await interaction.response.send_message(
-                view=_view(f"Slot `{slot}` has no uploaded emoji assigned."), ephemeral=True
+                view=_view(f"Slot `{slot}` has no uploaded emoji assigned.", ok=False), ephemeral=True
             )
             return
 
@@ -211,13 +224,16 @@ class EmojiManager(commands.Cog):
                 await match.delete()
         except discord.HTTPException as exc:
             await interaction.followup.send(
-                view=_view(f"Couldn't delete from Discord: `{exc}`"), ephemeral=True
+                view=_view(f"Couldn't delete from Discord: `{exc}`", ok=False), ephemeral=True
             )
             return
 
         await emoji_store.remove_emoji(slot)
         await interaction.followup.send(
-            view=_view(f"Deleted the application emoji for slot `{slot}` and cleared the assignment."),
+            view=_view(
+                nui.lead("SUCCESS", f"Deleted the application emoji for slot `{slot}` and cleared the assignment."),
+                ok=None,
+            ),
             ephemeral=True,
         )
 
