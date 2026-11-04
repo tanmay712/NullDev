@@ -10,8 +10,10 @@ from discord import ui
 from discord.ext import commands
 from discord.utils import utcnow
 
+from codezmanager.emojis import E
 from codezmanager.emojis import E as _EMGR
 from codezmanager import access
+from codezmanager import ui as nui
 import config as cfgmod
 
 DB_DIR = Path("db")
@@ -27,11 +29,7 @@ def ES(key: str) -> str:
     return _EMGR[_LOCAL_KEY_MAP.get(key, key.upper())]
 
 def _status_view(ok: bool, text: str) -> ui.LayoutView:
-    view = ui.LayoutView()
-    c = ui.Container()
-    c.add_item(ui.TextDisplay(text))
-    view.add_item(c)
-    return view
+    return nui.simple_view(text, ok=ok)
 
 def _ensure_db():
     DB_DIR.mkdir(exist_ok=True)
@@ -171,7 +169,10 @@ class VoiceStay(commands.Cog):
             return
 
         await set_lock(ctx.guild.id, channel.id)
-        await ctx.send(view=_status_view(True, f"Joined {channel.mention} and staying until kicked or `Cz!leave`."))
+        await ctx.send(view=_status_view(
+            True,
+            f"{E.ONLINE} Joined {channel.mention} and staying until kicked or `Cz!leave`.",
+        ))
 
     @commands.command(name="leave", aliases=["disconnect", "vcleave"])
     @commands.guild_only()
@@ -181,7 +182,7 @@ class VoiceStay(commands.Cog):
         vc = ctx.guild.voice_client
         if vc:
             await vc.disconnect(force=True)
-            await ctx.send(view=_status_view(True, "Left the voice channel."))
+            await ctx.send(view=_status_view(True, f"{E.OFFLINE} Left the voice channel."))
         else:
             await ctx.send(view=_status_view(False, "I'm not in a voice channel here."))
 

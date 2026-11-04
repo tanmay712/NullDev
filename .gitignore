@@ -1,0 +1,19 @@
+# Secrets — never commit the real thing
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Runtime databases (created on first run)
+db/*.db
+db/*.db-journal
+db/*.db-wal
+db/*.db-shm
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/

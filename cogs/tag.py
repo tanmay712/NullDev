@@ -10,7 +10,10 @@ import traceback
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
+from codezmanager.emojis import E
 from codezmanager.emojis import E as _EMGR
+from codezmanager import ui as nui
+import config as cfgmod
 import re as _re
 
 _LOCAL_KEY_MAP = {"success": "SUCCESS", "error": "ERROR"}
@@ -332,25 +335,16 @@ def generate_preview(nickname: str, font_id: int, effect_id: int,
     return buf
 
 def _error_view(text: str) -> ui.LayoutView:
-    v = ui.LayoutView()
-    c = ui.Container()
-    c.add_item(ui.TextDisplay(text))
-    v.add_item(c)
-    return v
+    """Red container prefixed with the NullDev cross."""
+    return nui.simple_view(text, ok=False)
 
 def _success_view(text: str) -> ui.LayoutView:
-    v = ui.LayoutView()
-    c = ui.Container()
-    c.add_item(ui.TextDisplay(text))
-    v.add_item(c)
-    return v
+    """Green container prefixed with the NullDev tick."""
+    return nui.simple_view(text, ok=True)
 
 def _info_view(text: str) -> ui.LayoutView:
-    v = ui.LayoutView()
-    c = ui.Container()
-    c.add_item(ui.TextDisplay(text))
-    v.add_item(c)
-    return v
+    """Neutral container prefixed with the NullDev info emoji."""
+    return nui.simple_view(nui.lead("INFO", text), accent=nui.BLURPLE)
 
 def build_colors_for_effect(effect_id: int, primary: int, secondary: int) -> list:
     if effect_id in (2, 6, 7, 8):
@@ -415,7 +409,7 @@ def build_main_view(cog, guild_id: int, state: dict) -> tuple:
 
     updated_str = f"<t:{updated}:R>" if updated else "`Never`"
 
-    c.add_item(ui.TextDisplay(f"### {nick} Name Style"))
+    c.add_item(ui.TextDisplay(f"### {E.UTILITY} {nick} Name Style"))
     c.add_item(ui.Separator())
 
     file = None
@@ -428,12 +422,12 @@ def build_main_view(cog, guild_id: int, state: dict) -> tuple:
     except Exception as e:
         print(f"[Tag] Preview gen failed: {e}")
         traceback.print_exc()
-        c.add_item(ui.TextDisplay(f"Preview unavailable: `{e}`"))
+        c.add_item(ui.TextDisplay(nui.lead("WARNING", f"Preview unavailable: `{e}`")))
 
     c.add_item(ui.TextDisplay(
-        f"**Font:** `{font['name']}`   "
-        f"**Effect:** `{effect['name']}`\n"
-        f"**Colors:** `{dec_to_hex(prim)}` → `{dec_to_hex(sec)}`"
+        f"{E.STAR} **Font:** `{font['name']}`   "
+        f"{E.LOADING} **Effect:** `{effect['name']}`\n"
+        f"{E.UTILITY} **Colors:** `{dec_to_hex(prim)}` → `{dec_to_hex(sec)}`"
     ))
     c.add_item(ui.Separator())
 
@@ -452,8 +446,9 @@ def build_main_view(cog, guild_id: int, state: dict) -> tuple:
 
     c.add_item(ui.Separator(visible=False))
     c.add_item(ui.TextDisplay(
-        f"-# {BOT_NAME} - Preset: `{preset}` - Last Applied: {updated_str}\n"
-        f"-# Changes update preview instantly. Press **Apply** to save to Discord."
+        f"-# {E.HOME} {BOT_NAME} - Preset: `{preset}` - Last Applied: {updated_str}\n"
+        f"-# {E.INFO} Changes update preview instantly. Press **Apply** to save to Discord.\n"
+        f"-# {E.NULLDEV} {cfgmod.BRAND_NAME} — {cfgmod.SUPPORT_SERVER_URL}"
     ))
 
     view.add_item(c)
@@ -534,11 +529,16 @@ class TagView(ui.LayoutView):
         )
         self.preset_select.callback = self._on_preset_select
 
-        self.btn_apply = ui.Button(label="Apply",       style=discord.ButtonStyle.success,   custom_id="t_apply")
-        self.btn_hex   = ui.Button(label="Custom Hex",  style=discord.ButtonStyle.primary,   custom_id="t_hex")
-        self.btn_edit  = ui.Button(label="Edit Name",   style=discord.ButtonStyle.primary,   custom_id="t_edit")
-        self.btn_reset = ui.Button(label="Reset",       style=discord.ButtonStyle.danger,    custom_id="t_reset")
-        self.btn_close = ui.Button(label="Close",       style=discord.ButtonStyle.secondary, custom_id="t_close")
+        self.btn_apply = ui.Button(label="Apply",       style=discord.ButtonStyle.success,   custom_id="t_apply",
+                                   emoji=E.TICK or None)
+        self.btn_hex   = ui.Button(label="Custom Hex",  style=discord.ButtonStyle.primary,   custom_id="t_hex",
+                                   emoji=E.UTILITY or None)
+        self.btn_edit  = ui.Button(label="Edit Name",   style=discord.ButtonStyle.primary,   custom_id="t_edit",
+                                   emoji=E.PERSON or None)
+        self.btn_reset = ui.Button(label="Reset",       style=discord.ButtonStyle.danger,    custom_id="t_reset",
+                                   emoji=E.CROSS or None)
+        self.btn_close = ui.Button(label="Close",       style=discord.ButtonStyle.secondary, custom_id="t_close",
+                                   emoji=E.HOME or None)
 
         self.btn_apply.callback = self._on_apply
         self.btn_hex.callback   = self._on_hex
@@ -634,7 +634,7 @@ class TagView(ui.LayoutView):
             e = get_effect_by_id(self.state["effect_id"])
             await interaction.followup.send(
                 view=_success_view(
-                    f"**Style Applied!**\n\n"
+                    f"{E.STAR} **Style Applied!**\n\n"
                     f"**Name:** `{self.state['nickname']}`\n"
                     f"**Font:** `{f['name']}`\n"
                     f"**Effect:** `{e['name']}`\n"
@@ -646,7 +646,7 @@ class TagView(ui.LayoutView):
             await self._refresh(interaction)
         else:
             await interaction.followup.send(
-                view=_error_view(f"**Apply Failed!**\n{format_error(result)}"),
+                view=_error_view(f"{E.WARNING} **Apply Failed!**\n{format_error(result)}"),
                 ephemeral=True,
             )
 
@@ -655,8 +655,8 @@ class TagView(ui.LayoutView):
         await interaction.response.send_message(
             view=_info_view(
                 "Send **two hex colors** separated by a space.\n"
-                "Format: `#FF0000 #000000`\n"
-                "*Timeout: 30 seconds*"
+                f"{E.TICK} Format: `#FF0000 #000000`\n"
+                f"{E.LOADING} *Timeout: 30 seconds*"
             ),
             ephemeral=True,
         )
@@ -677,7 +677,7 @@ class TagView(ui.LayoutView):
         self.state["selected_preset"] = "Custom"
         await interaction.edit_original_response(
             view=_success_view(
-                f"Colors set!\n`{dec_to_hex(self.state['primary_color'])}` → "
+                f"{E.STAR} Colors set!\n`{dec_to_hex(self.state['primary_color'])}` → "
                 f"`{dec_to_hex(self.state['secondary_color'])}`"
             )
         )
@@ -688,8 +688,8 @@ class TagView(ui.LayoutView):
         await interaction.response.send_message(
             view=_info_view(
                 f"Send the new **nickname**.\n"
-                f"Current: `{self.state['nickname']}`\n"
-                f"*Timeout: 30 seconds*"
+                f"{E.PERSON} Current: `{self.state['nickname']}`\n"
+                f"{E.LOADING} *Timeout: 30 seconds*"
             ),
             ephemeral=True,
         )
@@ -701,7 +701,9 @@ class TagView(ui.LayoutView):
                 view=_error_view("Nickname must be 32 characters or less.")
             )
         self.state["nickname"] = result
-        await interaction.edit_original_response(view=_success_view(f"Nickname: `{result}`"))
+        await interaction.edit_original_response(
+            view=_success_view(f"{E.PERSON} Nickname: `{result}`")
+        )
         await self._refresh(interaction)
 
     async def _on_reset(self, interaction: discord.Interaction):
@@ -722,7 +724,7 @@ class TagView(ui.LayoutView):
             self.state["updated_at"] = int(time.time())
             await self.cog.delete_state(self.guild_id)
             await interaction.followup.send(
-                view=_success_view("**Reset complete!** All styles cleared."),
+                view=_success_view(f"{E.UTILITY} **Reset complete!** All styles cleared."),
                 ephemeral=True,
             )
             await self._refresh(interaction)

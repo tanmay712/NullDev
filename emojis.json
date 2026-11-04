@@ -1,14 +1,34 @@
 {
-  "_comment": "CodeZ Manager does not use any emojis, custom or unicode. All values are intentionally blank.",
+  "_comment": "NullDev emoji set — every slot points at a custom emoji from the NullDev Discord (https://dc.definescloud.site). Anything uploaded with /emoji upload overrides the literal here via emojis.uploaded.json.",
+  "_legend": "NULLDEV/HOME = A_Home · PERSON = Person · ONLINE = Online2 · IDLE/LOADING = Loadings · DND = _DND · OFFLINE = cross_cross · SUCCESS/TICK = tick_tick · ERROR/CROSS = cross_cross · INFO = info2 · WARNING = warninga · STAR = stars_star · GIFT = st_gift · FLOWERS = flowerss · GAMES = cb_games · UTILITY = utility_",
 
-  "SUCCESS": "",
-  "ERROR": "",
-  "ONLINE": "",
+  "NULLDEV": "<:A_Home:1566836170334277693>",
+  "HOME": "<:A_Home:1566836170334277693>",
+  "PERSON": "<:Person:1566835616623239389>",
 
-  "TEAM_AVAILABLE": "<:online:1449604401068245023>",
-  "TEAM_UNAVAILABLE": "<:antinuke_nope:1441072868225056822>",
-  "TEAM_WARNING": "<:dot_red:1493869445205069915>",
+  "ONLINE": "<a:Online2:1566837586360541306>",
+  "IDLE": "<a:Loadings:1566837396987838764>",
+  "DND": "<a:_DND:1566837745375125695>",
+  "OFFLINE": "<a:cross_cross:1566836284708618281>",
+  "LOADING": "<a:Loadings:1566837396987838764>",
 
-  "STAR_FULL": "*",
-  "STAR_EMPTY": "-"
+  "SUCCESS": "<a:tick_tick:1566837086252703808>",
+  "ERROR": "<a:cross_cross:1566836284708618281>",
+  "TICK": "<a:tick_tick:1566837086252703808>",
+  "CROSS": "<a:cross_cross:1566836284708618281>",
+  "INFO": "<a:info2:1566836046375686154>",
+  "WARNING": "<a:warninga:1566837218897694760>",
+
+  "STAR": "<a:stars_star:1566835903094194328>",
+  "STAR_FULL": "<a:stars_star:1566835903094194328>",
+  "STAR_EMPTY": "☆",
+
+  "GIFT": "<a:st_gift:1566837219342286928>",
+  "FLOWERS": "<a:flowerss:1566835790065959012>",
+  "GAMES": "<a:cb_games:1566835476164513825>",
+  "UTILITY": "<a:utility_:1566836009226866801>",
+
+  "TEAM_AVAILABLE": "<a:Online2:1566837586360541306>",
+  "TEAM_UNAVAILABLE": "<a:cross_cross:1566836284708618281>",
+  "TEAM_WARNING": "<a:warninga:1566837218897694760>"
 }

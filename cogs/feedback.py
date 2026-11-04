@@ -7,7 +7,9 @@ import discord
 from discord import ui
 from discord.ext import commands
 
+from codezmanager.emojis import E
 from codezmanager.emojis import E as _EMGR
+from codezmanager import ui as nui
 import config as cfgmod
 
 DB_DIR = Path("db")
@@ -21,11 +23,7 @@ def ES(key: str) -> str:
     return _EMGR[_LOCAL_KEY_MAP.get(key, key.upper())]
 
 def _status_view(ok: bool, text: str) -> ui.LayoutView:
-    view = ui.LayoutView()
-    c = ui.Container()
-    c.add_item(ui.TextDisplay(text))
-    view.add_item(c)
-    return view
+    return nui.simple_view(text, ok=ok)
 
 def _ensure_db():
     DB_DIR.mkdir(exist_ok=True)
@@ -132,13 +130,13 @@ class FeedbackModal(ui.Modal, title="Submit Feedback"):
         view = ui.LayoutView()
         c = ui.Container()
         header = ui.TextDisplay(
-            f"**New Feedback**\n\n> {self.review_in.value.strip()}\n\n{_stars(rating)}  {rating} / 5"
+            f"{E.STAR} **New Feedback**\n\n> {self.review_in.value.strip()}\n\n{_stars(rating)}  {rating} / 5"
         )
         c.add_item(ui.Section(header, accessory=ui.Thumbnail(media=discord.UnfurledMediaItem(url=str(interaction.user.display_avatar.url)))))
         c.add_item(ui.TextDisplay(
-            f"{interaction.user}\n"
-            f"User ID: `{interaction.user.id}`\n"
-            f"<t:{int(discord.utils.utcnow().timestamp())}:F>"
+            f"{E.PERSON} {interaction.user}\n"
+            f"{E.UTILITY} User ID: `{interaction.user.id}`\n"
+            f"{E.LOADING} <t:{int(discord.utils.utcnow().timestamp())}:F>"
         ))
         if screenshot and screenshot.startswith(("http://", "https://")):
             c.add_item(ui.Separator())
@@ -146,7 +144,10 @@ class FeedbackModal(ui.Modal, title="Submit Feedback"):
             gallery.add_item(media=discord.UnfurledMediaItem(url=screenshot))
             c.add_item(gallery)
         c.add_item(ui.Separator())
-        leave_btn = ui.Button(label="Leave a review too", style=discord.ButtonStyle.primary, custom_id="fb_write_review")
+        leave_btn = ui.Button(
+            label="Leave a review too", style=discord.ButtonStyle.primary,
+            custom_id="fb_write_review", emoji=E.STAR or None,
+        )
 
         async def _open_modal(i: discord.Interaction):
             await i.response.send_modal(FeedbackModal())
@@ -156,17 +157,31 @@ class FeedbackModal(ui.Modal, title="Submit Feedback"):
         view.add_item(c)
 
         await channel.send(view=view)
-        await interaction.response.send_message(view=_status_view(True, "Thanks! Your feedback was submitted."), ephemeral=True)
+        await interaction.response.send_message(
+            view=_status_view(True, f"{_stars(rating)} Thanks! Your feedback was submitted."),
+            ephemeral=True,
+        )
 
 class FeedbackPanelView(ui.LayoutView):
 
     def __init__(self):
         super().__init__(timeout=None)
-        c = ui.Container()
-        c.add_item(ui.TextDisplay("**Share your feedback**\nTap the button below to rate us and leave a review."))
-        btn = ui.Button(label="Write Your Review", style=discord.ButtonStyle.primary, custom_id="fb_write_review")
+        c = ui.Container(accent_colour=nui.BLURPLE)
+        c.add_item(ui.TextDisplay(
+            nui.lead(
+                "STAR",
+                f"**Share your feedback**\n"
+                f"{E.STAR} Tap the button below to rate us and leave a review.\n"
+                f"-# Your review is posted in the {cfgmod.BRAND_NAME} feedback channel.",
+            )
+        ))
+        btn = ui.Button(
+            label="Write Your Review", style=discord.ButtonStyle.primary,
+            custom_id="fb_write_review", emoji=E.STAR or None,
+        )
         btn.callback = self.on_write
         c.add_item(ui.ActionRow(btn))
+        c.add_item(ui.ActionRow(nui.support_button()))
         self.add_item(c)
 
     async def on_write(self, interaction: discord.Interaction):

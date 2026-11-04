@@ -7,7 +7,9 @@ import discord
 from discord import ui
 from discord.ext import commands
 
+from codezmanager.emojis import E
 from codezmanager.emojis import E as _EMGR
+from codezmanager import ui as nui
 import config as cfgmod
 
 DB_DIR = Path("db")
@@ -20,12 +22,14 @@ def ES(key: str) -> str:
     return _EMGR[_LOCAL_KEY_MAP.get(key, key.upper())]
 
 
-def _status_view(text: str) -> ui.LayoutView:
-    view = ui.LayoutView()
-    c = ui.Container()
-    c.add_item(ui.TextDisplay(text))
-    view.add_item(c)
-    return view
+def _status_view(ok: bool, text: str) -> ui.LayoutView:
+    """Green + NullDev tick on success, red + NullDev cross on failure."""
+    return nui.simple_view(text, ok=ok)
+
+
+def _info_view(text: str) -> ui.LayoutView:
+    """Neutral blue container for usage / informational messages."""
+    return nui.simple_view(text, accent=nui.BLURPLE)
 
 
 def _ensure_db():
@@ -143,11 +147,19 @@ async def get_open_ticket_for_user(guild_id: int, user_id: int) -> dict | None:
 
 def _panel_view() -> ui.LayoutView:
     view = ui.LayoutView(timeout=None)
-    c = ui.Container()
-    c.add_item(ui.TextDisplay("### Support Tickets\nNeed help? Click below to open a private ticket with staff."))
+    c = ui.Container(accent_colour=nui.BLURPLE)
+    c.add_item(ui.TextDisplay(
+        f"### {E.GIFT} Support Tickets\n"
+        f"{E.INFO} Need help? Click below to open a private ticket with staff.\n"
+        f"{E.PERSON} A staff member will claim it and reply as soon as they can."
+    ))
     c.add_item(ui.Separator())
-    button = ui.Button(label="Open Ticket", style=discord.ButtonStyle.primary, custom_id="codez_ticket_open")
+    button = ui.Button(
+        label="Open Ticket", style=discord.ButtonStyle.primary,
+        custom_id="codez_ticket_open", emoji=E.GIFT or None,
+    )
     c.add_item(ui.ActionRow(button))
+    c.add_item(ui.TextDisplay(nui.footer_line(f"{cfgmod.BRAND_NAME} support")))
     view.add_item(c)
     return view
 
@@ -155,13 +167,20 @@ def _panel_view() -> ui.LayoutView:
 def _ticket_control_view(claimed: bool) -> ui.LayoutView:
     view = ui.LayoutView(timeout=None)
     c = ui.Container()
-    c.add_item(ui.TextDisplay("Use the buttons below to manage this ticket."))
+    c.add_item(ui.TextDisplay(nui.lead(
+        "UTILITY", "Use the buttons below to manage this ticket." if not claimed
+        else "This ticket is claimed. Use the buttons below to manage it."
+    )))
     claim_btn = ui.Button(
         label="Unclaim" if claimed else "Claim",
         style=discord.ButtonStyle.secondary,
         custom_id="codez_ticket_claim",
+        emoji=(E.PERSON if not claimed else E.CROSS) or None,
     )
-    close_btn = ui.Button(label="Close Ticket", style=discord.ButtonStyle.danger, custom_id="codez_ticket_close")
+    close_btn = ui.Button(
+        label="Close Ticket", style=discord.ButtonStyle.danger,
+        custom_id="codez_ticket_close", emoji=E.WARNING or None,
+    )
     c.add_item(ui.ActionRow(claim_btn, close_btn))
     view.add_item(c)
     return view
@@ -176,11 +195,12 @@ class Tickets(commands.Cog):
     @commands.guild_only()
     async def ticket_group(self, ctx: commands.Context):
         await ctx.send(
-            view=_status_view(
-                f"`{cfgmod.DEFAULT_PREFIX}ticket panel` — post the ticket panel here.\n"
-                f"`{cfgmod.DEFAULT_PREFIX}ticket category <#category>` — set where ticket channels are created.\n"
-                f"`{cfgmod.DEFAULT_PREFIX}ticket role <@role>` — set the support role that can see tickets.\n"
-                f"`{cfgmod.DEFAULT_PREFIX}ticket logs <#channel>` — set the transcript log channel."
+            view=_info_view(
+                f"### {E.GIFT} Ticket Commands\n"
+                f"{E.TICK} `{cfgmod.DEFAULT_PREFIX}ticket panel` — post the ticket panel here.\n"
+                f"{E.TICK} `{cfgmod.DEFAULT_PREFIX}ticket category <#category>` — where ticket channels are created.\n"
+                f"{E.TICK} `{cfgmod.DEFAULT_PREFIX}ticket role <@role>` — support role that can see tickets.\n"
+                f"{E.TICK} `{cfgmod.DEFAULT_PREFIX}ticket logs <#channel>` — transcript log channel."
             )
         )
 
@@ -192,28 +212,28 @@ class Tickets(commands.Cog):
         msg = await target.send(view=_panel_view())
         await set_config(ctx.guild.id, panel_channel_id=target.id, panel_message_id=msg.id)
         if target.id != ctx.channel.id:
-            await ctx.send(view=_status_view(f"Ticket panel posted in {target.mention}."))
+            await ctx.send(view=_status_view(True, f"Ticket panel posted in {target.mention}."))
 
     @ticket_group.command(name="category", help="Set the category where new ticket channels are created.")
     @commands.guild_only()
     @commands.has_permissions(manage_guild=True)
     async def ticket_category(self, ctx: commands.Context, category: discord.CategoryChannel):
         await set_config(ctx.guild.id, category_id=category.id)
-        await ctx.send(view=_status_view(f"Tickets will be created under **{category.name}**."))
+        await ctx.send(view=_status_view(True, f"Tickets will be created under **{category.name}**."))
 
     @ticket_group.command(name="role", help="Set the support role that can view and manage tickets.")
     @commands.guild_only()
     @commands.has_permissions(manage_guild=True)
     async def ticket_role(self, ctx: commands.Context, role: discord.Role):
         await set_config(ctx.guild.id, support_role_id=role.id)
-        await ctx.send(view=_status_view(f"Support role set to **{role.name}**."))
+        await ctx.send(view=_status_view(True, f"Support role set to **{role.name}**."))
 
     @ticket_group.command(name="logs", help="Set the channel where closed ticket transcripts are posted.")
     @commands.guild_only()
     @commands.has_permissions(manage_guild=True)
     async def ticket_logs(self, ctx: commands.Context, channel: discord.TextChannel):
         await set_config(ctx.guild.id, log_channel_id=channel.id)
-        await ctx.send(view=_status_view(f"Transcripts will be posted in {channel.mention}."))
+        await ctx.send(view=_status_view(True, f"Transcripts will be posted in {channel.mention}."))
 
     @ticket_group.command(name="close", help="Close the current ticket channel.")
     @commands.guild_only()
@@ -243,7 +263,8 @@ class Tickets(commands.Cog):
             channel = guild.get_channel(existing["channel_id"])
             if channel:
                 await interaction.response.send_message(
-                    f"You already have an open ticket: {channel.mention}", ephemeral=True
+                    view=_status_view(False, f"You already have an open ticket: {channel.mention}"),
+                    ephemeral=True,
                 )
                 return
 
@@ -272,40 +293,53 @@ class Tickets(commands.Cog):
             )
         except discord.Forbidden:
             await interaction.response.send_message(
-                "I do not have permission to create ticket channels.", ephemeral=True
+                view=_status_view(False, "I do not have permission to create ticket channels."),
+                ephemeral=True,
             )
             return
 
         await create_ticket_record(channel.id, guild.id, opener.id, number)
 
         intro = ui.LayoutView(timeout=None)
-        c = ui.Container()
+        c = ui.Container(accent_colour=nui.BLURPLE)
         mention = support_role.mention if support_role else "the support team"
         c.add_item(
             ui.TextDisplay(
-                f"### Ticket #{number:04d}\n{opener.mention} opened this ticket. {mention} will be with you shortly."
+                f"### {E.GIFT} Ticket #{number:04d}\n"
+                f"{E.PERSON} {opener.mention} opened this ticket. {mention} will be with you shortly.\n"
+                f"{E.INFO} Describe the issue with as much detail as you can.\n"
+                f"{E.WARNING} Closing the ticket deletes this channel and logs a transcript."
             )
         )
         intro.add_item(c)
         await channel.send(view=intro)
         await channel.send(view=_ticket_control_view(claimed=False))
 
-        await interaction.response.send_message(f"Your ticket has been created: {channel.mention}", ephemeral=True)
+        await interaction.response.send_message(
+            view=_status_view(True, f"Your ticket has been created: {channel.mention}"),
+            ephemeral=True,
+        )
 
     async def _toggle_claim(self, interaction: discord.Interaction):
         ticket = await get_ticket(interaction.channel.id)
         if not ticket:
-            await interaction.response.send_message("This channel is not a ticket.", ephemeral=True)
+            await interaction.response.send_message(
+                view=_status_view(False, "This channel is not a ticket."), ephemeral=True
+            )
             return
 
         if ticket["claimed_by"] == interaction.user.id:
             await set_ticket_claim(interaction.channel.id, None)
             await interaction.response.edit_message(view=_ticket_control_view(claimed=False))
-            await interaction.channel.send(view=_status_view(f"{interaction.user.mention} unclaimed this ticket."))
+            await interaction.channel.send(view=_status_view(
+                True, f"{interaction.user.mention} unclaimed this ticket."
+            ))
         else:
             await set_ticket_claim(interaction.channel.id, interaction.user.id)
             await interaction.response.edit_message(view=_ticket_control_view(claimed=True))
-            await interaction.channel.send(view=_status_view(f"{interaction.user.mention} claimed this ticket."))
+            await interaction.channel.send(view=_status_view(
+                True, nui.lead("PERSON", f"{interaction.user.mention} claimed this ticket.")
+            ))
 
     async def _close_ticket(self, channel: discord.abc.GuildChannel, closer: discord.abc.User):
         ticket = await get_ticket(channel.id)
@@ -337,12 +371,13 @@ class Tickets(commands.Cog):
             file = discord.File(buffer, filename=f"ticket-{ticket['number']:04d}-transcript.txt")
 
             summary = ui.LayoutView()
-            c = ui.Container()
+            c = ui.Container(accent_colour=nui.RED)
             c.add_item(
                 ui.TextDisplay(
-                    f"### Ticket #{ticket['number']:04d} closed\n"
-                    f"Opened by **{opener_name}**\n"
-                    f"Closed by **{closer.display_name if hasattr(closer, 'display_name') else closer}**"
+                    f"### {E.CROSS} Ticket #{ticket['number']:04d} closed\n"
+                    f"{E.PERSON} Opened by **{opener_name}**\n"
+                    f"{E.WARNING} Closed by **{closer.display_name if hasattr(closer, 'display_name') else closer}**\n"
+                    f"{E.LOADING} <t:{int(discord.utils.utcnow().timestamp())}:F>"
                 )
             )
             summary.add_item(c)

@@ -11,6 +11,8 @@ from discord.ext import commands, tasks
 
 import config as cfgmod
 from codezmanager.emojis import E as _EMGR
+from codezmanager import ui as nui
+from codezmanager.emojis import E
 
 DB_DIR = Path("db")
 DB_PATH = DB_DIR / "teamsetup.db"
@@ -29,13 +31,9 @@ def _with(emoji: str, text: str) -> str:
     return f"{emoji} {text}" if emoji else text
 
 
-def _view(text: str) -> ui.LayoutView:
-    """A plain container with a single text block. No colour."""
-    view = ui.LayoutView()
-    container = ui.Container()
-    container.add_item(ui.TextDisplay(text))
-    view.add_item(container)
-    return view
+def _view(text: str, ok: bool | None = None) -> ui.LayoutView:
+    """A single-container view; ``ok`` adds the NullDev tick/cross + accent."""
+    return nui.simple_view(text, ok=ok)
 
 
 def _today() -> str:
@@ -173,34 +171,41 @@ async def build_panel_view(guild: discord.Guild) -> ui.LayoutView:
     c = ui.Container()
 
     if not role_ids:
-        c.add_item(ui.TextDisplay(
-            f"No team roles set. Run `{cfgmod.DEFAULT_PREFIX}teamsetup @role` first."
-        ))
+        c.add_item(ui.TextDisplay(nui.lead(
+            "WARNING", f"No team roles set. Run `{cfgmod.DEFAULT_PREFIX}teamsetup @role` first."
+        )))
         view.add_item(c)
         return view
 
     # ---- Available
-    c.add_item(ui.TextDisplay(_with(_e("TEAM_AVAILABLE"), "### Available Support")))
+    c.add_item(ui.TextDisplay(f"### {_e('TEAM_AVAILABLE')} Available Support"))
     if available:
-        c.add_item(ui.TextDisplay("\n".join(f"**{m.display_name}**" for m in available)))
+        c.add_item(ui.TextDisplay("\n".join(
+            f"{nui.status_emoji(m.status)} **{m.display_name}**" for m in available
+        )))
     else:
-        c.add_item(ui.TextDisplay("*Nobody is available right now.*"))
+        c.add_item(ui.TextDisplay(nui.lead("OFFLINE", "*Nobody is available right now.*")))
 
     c.add_item(ui.Separator())
 
     # ---- Unavailable
-    c.add_item(ui.TextDisplay(_with(_e("TEAM_UNAVAILABLE"), "### Unavailable Support")))
+    c.add_item(ui.TextDisplay(f"### {_e('TEAM_UNAVAILABLE')} Unavailable Support"))
     if unavailable:
-        c.add_item(ui.TextDisplay("\n".join(m.display_name for m in unavailable)))
+        c.add_item(ui.TextDisplay("\n".join(
+            f"{E.OFFLINE} {m.display_name}" for m in unavailable
+        )))
     else:
-        c.add_item(ui.TextDisplay("*Everyone is available.*"))
+        c.add_item(ui.TextDisplay(nui.lead("ONLINE", "*Everyone is available.*")))
 
     c.add_item(ui.Separator())
 
     # ---- Warning + footer
     c.add_item(ui.TextDisplay(_with(_e("TEAM_WARNING"), f"**{WARNING_TEXT}**")))
     c.add_item(ui.Separator())
-    c.add_item(ui.TextDisplay(f"Updated {_ts(discord.utils.utcnow())}"))
+    c.add_item(ui.TextDisplay(
+        f"{E.LOADING} Updated {_ts(discord.utils.utcnow())}\n"
+        f"-# {cfgmod.BRAND_NAME} — {cfgmod.SUPPORT_SERVER_URL}"
+    ))
 
     view.add_item(c)
     return view
@@ -241,24 +246,29 @@ class TeamSetup(commands.Cog):
 
         if not roles:
             await ctx.send(view=_view(
-                "### Team Setup\n"
-                "Mention the existing roles you want to track:\n"
-                f"`{prefix}teamsetup @Staff @Moderator @Admin`"
+                nui.lead(
+                    "PERSON",
+                    f"### {E.PERSON} Team Setup\n"
+                    "Mention the existing roles you want to track:\n"
+                    f"{E.TICK} `{prefix}teamsetup @Staff @Moderator @Admin`",
+                )
             ))
             return
 
         lines = []
         for role in roles:
             if role.is_default():
-                lines.append("Skipped **@everyone** (cannot be tracked)")
+                lines.append(nui.lead("WARNING", "Skipped **@everyone** (cannot be tracked)"))
                 continue
             newly_added = await add_team_role(ctx.guild.id, role.id, role.name)
-            lines.append(f"Now tracking {role.mention}" if newly_added
-                         else f"Already tracking {role.mention} (updated)")
+            lines.append(
+                nui.lead("TICK", f"Now tracking {role.mention}") if newly_added
+                else nui.lead("INFO", f"Already tracking {role.mention} (updated)")
+            )
 
         lines.append("")
-        lines.append(f"Next: `{prefix}teampanel #channel`")
-        await ctx.send(view=_view("### Team Setup\n" + "\n".join(lines)))
+        lines.append(nui.lead("UTILITY", f"Next: `{prefix}teampanel #channel`"))
+        await ctx.send(view=_view(f"### {E.PERSON} Team Setup\n" + "\n".join(lines)))
         await self.refresh(ctx.guild)
 
     @commands.command(name="teamroles", help="List the currently tracked staff roles. Owner only.")
@@ -267,14 +277,17 @@ class TeamSetup(commands.Cog):
     async def teamroles(self, ctx: commands.Context):
         rows = await get_team_roles(ctx.guild.id)
         if not rows:
-            await ctx.send(view=_view(f"No team roles set. Run `{cfgmod.DEFAULT_PREFIX}teamsetup @role` first."))
+            await ctx.send(view=_view(
+                nui.lead("WARNING", f"No team roles set. Run `{cfgmod.DEFAULT_PREFIX}teamsetup @role` first."),
+                ok=False,
+            ))
             return
 
-        lines = ["### Tracked Team Roles", ""]
+        lines = [f"### {E.PERSON} Tracked Team Roles", ""]
         for row in rows:
             role = ctx.guild.get_role(row["role_id"])
-            lines.append(f"{role.mention} (`{role.id}`)" if role
-                         else f"Deleted role **{row['label']}** (`{row['role_id']}`)")
+            lines.append(f"{E.TICK} {role.mention} (`{role.id}`)" if role
+                         else nui.lead("WARNING", f"Deleted role **{row['label']}** (`{row['role_id']}`)"))
         await ctx.send(view=_view("\n".join(lines)))
 
     @commands.command(name="teamremoverole", help="Stop tracking a staff role. Owner only.")
@@ -282,8 +295,11 @@ class TeamSetup(commands.Cog):
     @commands.is_owner()
     async def teamremoverole(self, ctx: commands.Context, role: discord.Role):
         removed = await remove_team_role(ctx.guild.id, role.id)
-        await ctx.send(view=_view(f"Stopped tracking {role.mention}." if removed
-                                  else f"{role.mention} was not being tracked."))
+        await ctx.send(view=_view(
+            nui.lead("SUCCESS", f"Stopped tracking {role.mention}.") if removed
+            else nui.lead("ERROR", f"{role.mention} was not being tracked."),
+            ok=None,
+        ))
         if removed:
             await self.refresh(ctx.guild)
 
@@ -293,7 +309,10 @@ class TeamSetup(commands.Cog):
     async def teampanel(self, ctx: commands.Context, channel: discord.TextChannel):
         rows = await get_team_roles(ctx.guild.id)
         if not rows:
-            await ctx.send(view=_view(f"Set roles first: `{cfgmod.DEFAULT_PREFIX}teamsetup @role`"))
+            await ctx.send(view=_view(
+                nui.lead("WARNING", f"Set roles first: `{cfgmod.DEFAULT_PREFIX}teamsetup @role`"),
+                ok=False,
+            ))
             return
 
         # Point at the new channel and force a fresh post there.
@@ -301,11 +320,19 @@ class TeamSetup(commands.Cog):
         ok = await self.refresh(ctx.guild, force=True)
         if ok:
             await ctx.send(view=_view(
-                f"Panel posted in {channel.mention}. It will be edited through the day and a new one posted tomorrow."
+                nui.lead(
+                    "SUCCESS",
+                    f"Panel posted in {channel.mention}. It will be edited through the day and a new one posted tomorrow.",
+                ),
+                ok=None,
             ))
         else:
             await ctx.send(view=_view(
-                f"Could not post in {channel.mention}. Check that I can view and send messages there."
+                nui.lead(
+                    "ERROR",
+                    f"Could not post in {channel.mention}. Check that I can view and send messages there.",
+                ),
+                ok=False,
             ))
 
     @commands.command(name="teamrefresh", help="Force-update the staff panel now. Owner only.")
@@ -313,8 +340,11 @@ class TeamSetup(commands.Cog):
     @commands.is_owner()
     async def teamrefresh(self, ctx: commands.Context):
         ok = await self.refresh(ctx.guild, force=True)
-        await ctx.send(view=_view("Panel refreshed." if ok
-                                  else f"No panel set. Run `{cfgmod.DEFAULT_PREFIX}teampanel #channel` first."))
+        await ctx.send(view=_view(
+            nui.lead("SUCCESS", "Panel refreshed.") if ok
+            else nui.lead("ERROR", f"No panel set. Run `{cfgmod.DEFAULT_PREFIX}teampanel #channel` first."),
+            ok=None,
+        ))
 
     # --------------------------------------------------------------- refreshing
     async def refresh(self, guild: discord.Guild, force: bool = False) -> bool:
